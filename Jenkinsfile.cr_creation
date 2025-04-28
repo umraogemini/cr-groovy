@@ -1,0 +1,74 @@
+@Library("jenkins-shared-library@master") _
+
+def CR_MINION_URL_MAP = [
+    'UAT' : 'https://cr-minion-uat.uk.hsbc/api/v3',
+    'PROD': 'https://cr-minion.uk.hsbc/api/v3'
+]
+
+properties([
+    parameters([
+        choice(name: 'ENV', choices: ['PROD', 'UAT'], description: 'Environment that CR will be created to (PROD/UAT)'),
+        string(name: 'JIRA_TICKET_REF', description: 'Specify Jira Ticket related to the CR'),
+        string(name: 'CR_MINION_APPLICATION', defaultValue: 'otp-generic-service-template', description: 'CR-Minion application (template)'),
+        text(name: 'BUSINESS_JUSTIFICATION', defaultValue: "", description: 'Add business justification. Leave empty to use content from template'),
+        text(name: 'IMPLEMENTATION_PLAN', defaultValue: "", description: 'All the steps required for the change implementation sequentially. Leave empty to use content from template'),
+        text(name: 'BUSINESS_IMPACT', defaultValue: "", description: 'Define business impact of the release. Leave empty to use content from template'),
+        string(name: 'CR_START_DATETIME', description: 'CR implementation window start datetime in GMT timezone. (e.g., 2024-01-01T12:00:00)'),
+        choice(name: 'TIME_ZONE', choices: ['GMT', 'Europe/London', 'Asia/Shanghai'], description: 'Timezone for CR schedule start date time (Default GMT)'),
+        string(name: 'CR_DURATION', defaultValue: "60", description: 'Duration of CR implementation window in minutes'),
+        password(name: 'CR_LOGIN_PASSWORD', defaultValue: "", description: 'Your AD password to login to CR-Minion')
+                                      
+    ])
+])
+
+def ENV = params.ENV ?: 'PROD'
+def CR_MINION_URL = CR_MINION_URL_MAP.get(ENV)
+// If set an empty password, will use the stored credentials:
+// e.g. "cr-minion-bearer-token-uat-45266300"
+def CR_MINION_CREDENTIALS_PREFIX = "cr-minion-bearer-token-${ENV.toLowerCase()}-"
+
+pipeConstructor([
+    pipeController: 
+    [
+        buildtime: 
+        [
+            "gcp-treasuryeng-jenkins-slave": 
+            [
+                label: 
+                [
+                    name: "gcp-treasuryeng-jenkins-slave",
+                    randomIndex: 5
+                  ]
+                ]
+            ]
+        ],
+        stageBuildTestPublish: 
+        [
+            build: 
+            [
+                updateSetting: false,
+                stageTag: "Preparation"
+            ]
+        ],
+        stageDockerDeployment: 
+        [
+            "Create CR": [
+                cr_create: [
+                    stageTag: 'Create CR',
+                    enable: true,
+                    crMinionUrl: CR_MINION_URL,
+                    ticketRef: params.JIRA_TICKET_REF,
+                    assignmentGroup: 'ONE-GLOBAL-TREASURY-PLATFORM',
+                    application: 'opt-generic-service-template',
+                    businessJustification: params.BUSINESS_JUSTIFICATION,
+                    implementationPlan: params.IMPLEMENTATION_PLAN,
+                    businessImpact: params.BUSINESS_IMPACT,
+                    scheduleStartDateTime: params.CR_START_DATETIME,
+                    timeZone: params.TIME_ZONE,
+                    duration: params.CR_DURATION,
+                    crMinionCredentialsPrefix: CR_MINION_CREDENTIALS_PREFIX
+                ]
+                                                
+            ]
+        ]
+])
