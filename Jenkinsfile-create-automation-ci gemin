@@ -1,0 +1,77 @@
+pipeline {
+    agent { label "gcp-bffpeak-jenkins-slave" } // Or your desired agent
+
+    environment {
+        SERVICENOW_INSTANCE_URL = "https://hsbcitidu.service-now.com/servicenow"
+        SERVICENOW_API_PATH = "/api/now/table/cmdb_ci_automation"
+        SERVICENOW_USERNAME_CREDENTIALS_ID = "servicenow-credentials" // Replace with your ServiceNow credentials ID
+    }
+
+    parameters {
+        string(name: 'AUTOMATION_CI_NAME', defaultValue: 'Jenkins Managed Automation CI', description: 'Name of the Automation CI')
+        string(name: 'AUTOMATION_CI_SHORT_DESCRIPTION', defaultValue: 'Automation CI created by Jenkins', description: 'Short description of the Automation CI')
+        string(name: 'CUSTOM_FIELD_VALUE', defaultValue: 'Jenkins Custom Value', description: 'Value for your custom field')
+    }
+
+    stages {
+        stage('Create ServiceNow CI') {
+            steps {
+                script {
+                    def servicenowUrl = "${env.SERVICENOW_INSTANCE_URL}${env.SERVICENOW_API_PATH}"
+                    def credentials = credentials(env.SERVICENOW_USERNAME_CREDENTIALS_ID)
+                    def servicenowUsername = credentials.username
+                    def servicenowPassword = credentials.password
+
+                    def ciPayload = [
+                        short_description: params.AUTOMATION_CI_SHORT_DESCRIPTION,
+                        name: params.AUTOMATION_CI_NAME,
+                        operational_status: "1",
+                        install_status: "1",
+                        discovery_source: "Jenkins",
+                        u_custom_field: params.CUSTOM_FIELD_VALUE
+                        // Add other fields as needed
+                    ]
+
+                    try {
+                        def response = httpRequest(
+                            url: servicenowUrl,
+                            httpMode: 'POST',
+                            requestBody: groovy.json.JsonOutput.toJson(ciPayload),
+                            contentType: 'application/json',
+                            acceptType: 'application/json',
+                            authentication: 'Basic',
+                            username: servicenowUsername,
+                            password: servicenowPassword,
+                            responseHandle: 'STRING'
+                        )
+
+                        if (response.status >= 200 && response.status < 300) {
+                            def responseData = groovy.json.JsonSlurper().parseText(response.content)
+                            def ciSysId = responseData.result.sys_id
+                            def ciNumber = responseData.result.number
+                            echo "Successfully created ServiceNow CI:"
+                            echo "  Sys ID: ${ciSysId}"
+                            echo "  Number: ${ciNumber}"
+                            env.SERVICENOW_CI_SYS_ID = ciSysId
+                            env.SERVICENOW_CI_NUMBER = ciNumber
+                        } else {
+                            error "Failed to create ServiceNow CI. Status: ${response.status}, Response: ${response.content}"
+                        }
+                    } catch (Exception e) {
+                        error "Error during ServiceNow API call: ${e.getMessage()}"
+                    }
+                }
+            }
+        }
+        stage('Further Actions (Optional)') {
+            steps {
+                script {
+                    if (env.SERVICENOW_CI_SYS_ID) {
+                        echo "ServiceNow CI Sys ID available for further processing: ${env.SERVICENOW_CI_SYS_ID}"
+                        // You can add steps here to update the CI or create a Change Request linked to it
+                    }
+                }
+            }
+        }
+    }
+}
