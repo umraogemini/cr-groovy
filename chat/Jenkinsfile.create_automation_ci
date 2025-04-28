@@ -1,0 +1,42 @@
+@Library("jenkins-shared-library@master") _
+
+def SERVICENOW_INSTANCE_URL = "https://hsbcitidu.service-now.com"
+def SERVICENOW_API_TABLE = "/api/now/table/cmdb_ci_automation"
+
+properties([
+    parameters([
+        string(name: 'SERVICENOW_USERNAME', defaultValue: 'jenkins_service_account', description: 'ServiceNow Username'),
+        password(name: 'SERVICENOW_PASSWORD', defaultValue: '', description: 'ServiceNow Password'),
+        string(name: 'AUTOMATION_CI_NAME', defaultValue: 'Terraform Managed Automation CI', description: 'Automation CI Name'),
+        string(name: 'AUTOMATION_CI_SHORT_DESCRIPTION', defaultValue: 'Automation CI created by Groovy', description: 'Automation CI Short Description'),
+        string(name: 'CUSTOM_FIELD_VALUE', defaultValue: 'custom value', description: 'Custom field value')
+    ])
+])
+
+pipeConstructor([
+    pipeController: [
+        buildtime: [
+            "gcp-bffpeak-jenkins-slave": [
+                label: [
+                    name: "gcp-bffpeak-jenkins-slave",
+                    randomIndex: 3
+                ]
+            ]
+        ]
+    ],
+    stageDockerDeployment: [
+        "Create Automation CI": [
+            automation_ci_create: [
+                stageTag: 'Create Automation CI',
+                enable: true,
+                servicenowInstanceUrl: SERVICENOW_INSTANCE_URL,
+                servicenowApiTable: SERVICENOW_API_TABLE,
+                automationCiName: params.AUTOMATION_CI_NAME,
+                automationCiShortDescription: params.AUTOMATION_CI_SHORT_DESCRIPTION,
+                customFieldValue: params.CUSTOM_FIELD_VALUE,
+                servicenowUsername: params.SERVICENOW_USERNAME,
+                servicenowPassword: params.SERVICENOW_PASSWORD
+            ]
+        ]
+    ]
+])
