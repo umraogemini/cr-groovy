@@ -58,3 +58,11 @@ Optionally configure authentication (basic auth, OAuth, etc.).
 5. (Optional) Connect to Grafana
 
 You can deploy Grafana using Terraform + Helm as well, and configure it to use Prometheus as a data source.
+
+
+
+Hi Tao,
+
+The Terraform code for log-based metrics is working fine, and the alert emails are being received. However, I added the project ID in the code, but it's not showing in the email notification. I tried different approaches, but the project ID still doesn’t appear in the email.
+
+Also, when I use my personal email for testing, the project ID is displayed correctly. But when I use the GCP xMatters notification email, the project ID does not show—although the rest of the data is displayed correctly, even when I hardcode the project ID in the message text.
